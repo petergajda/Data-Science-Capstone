@@ -119,7 +119,7 @@ What would be the next steps to improve the performance and user experience of t
 For further reading please check
 
 - [The app: NextWord!](https://petergajda.shinyapps.io/Next_Word_Prediction/)
-- github repository
+- [Github repository](https://github.com/petergajda/Data-Science-Capstone)
 - [Milestone Report - Data preprocessing](https://rpubs.com/pgajda/Milestone_Report)
 - [Peter Gajda on Twitter](https://twitter.com/ptrgjd)
 

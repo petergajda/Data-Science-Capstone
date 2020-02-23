@@ -119,7 +119,7 @@ navbarPage("NextWord!",
               tags$br(),
               print("Here you find further information about the app and the author."),
               tags$ul(
-                tags$li("Github repository"), 
+                tags$li(a("Github repository", target="_blank", href="https://github.com/petergajda/Data-Science-Capstone")),
                 tags$li(a("Pitchdeck", target="_blank", href="https://rpubs.com/pgajda/Next_Word_Prediction")),
                 tags$li(a("Peter Gajda on Twitter: @ptrgjd", target="_blank", href="https://twitter.com/ptrgjd")))
               )),
