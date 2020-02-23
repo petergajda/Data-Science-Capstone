@@ -33,9 +33,9 @@ All resulting applications and files are listed here:
 
 The app is based on different packages especially containing NLP. Especially these sources have to be highlighted:
 
-> [Journal of Statistical Science, Text Mining Infrastructure in R](https://www.jstatsoft.org/article/view/v025i05)
-> [Text Mining with R](https://www.tidytextmining.com/ngrams.html)
-> [stringdist](https://cran.r-project.org/web/packages/stringdist/stringdist.pdf)
+- [Journal of Statistical Science, Text Mining Infrastructure in R](https://www.jstatsoft.org/article/view/v025i05)
+- [Text Mining with R](https://www.tidytextmining.com/ngrams.html)
+- [stringdist](https://cran.r-project.org/web/packages/stringdist/stringdist.pdf)
 
 ---
 
