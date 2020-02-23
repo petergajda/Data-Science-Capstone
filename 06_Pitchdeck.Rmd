@@ -1,0 +1,127 @@
+---
+title: "NextWord! - Pitch Deck <br> Coursera Data Science Capstone"
+author: "Peter Gajda"
+date: "February 23, 2020 <br> <br> <br> Please use arrow keys or swipe for next slide"
+output: ioslides_presentation
+widescreen: true
+smaller: true
+---
+
+<style>
+.title-slide {
+  background-color: #303030; /* #EDE0CF; ; #CA9F9D*/
+}
+slides > slide.backdrop {
+  background: #303030;
+}
+body p {
+  color: #FFFFFF;
+}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+## NextWord! - How to use the App
+<div style= "float:right;position: relative; top: 0px;">
+```{r Howto, echo = FALSE, out.width = "70%", fig.pos="h", fig.align='right'}
+library(knitr)
+test <- c("C:/Projekte/Projects/R/Coursera/Week 10/Shiny/Word_Prediction/www/howitworks1.PNG")
+include_graphics(test)
+```
+</div>
+
+<font size="3">
+How does the app work?
+
+The usage of the app [NextWord!](https://petergajda.shinyapps.io/Next_Word_Prediction/) is simple.
+
+Just type a word and the app will predict the most probable next word (scenario 1).
+The app is convenient to use, fast and responsive on desktop and mobile screens.
+
+The app could be implemented on all devices where text input is common.
+
+If the prediction engine shouldn't be able to give a prediction based on user input (e.g. in case of misspelled words), the engine tries to interpret the most probable meaning of the user input and tries to predict the next word on this basis (scenario 2). In this case the user also gets immediate feedback and is informed with yellow letters, that his input was interpreted differently. 
+
+In this way, the engine always provides a prediction of the next word in this way.
+
+</font>
+
+
+## Prediction Model: ngram model
+<div style= "float:right;position: relative; top: 0px;">
+```{r Prediction, echo = FALSE, out.width = "80%", fig.pos="h", fig.align='right'}
+library(knitr)
+test <- c("C:/Projekte/Projects/R/Coursera/Week 10/Shiny/Word_Prediction/www/ngram.PNG")
+include_graphics(test)
+```
+</div>
+
+<font size="3">
+What is the prediction based on and how does it work?
+
+Basically, the prediction is based on [twitter, news site and blog text sentences](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip). Since the evaluation of huge text files requieres large amounts of memory it is an important task to provide representative pieces of this text elements, which still provide a good basis for prediction. The whole approach of text manipulation can be found in the [Milestone Report](https://rpubs.com/pgajda/Milestone_Report).
+
+To sum up, the text was sampled and unnecessary punctuation and numbers were removed and the text was transformed to lower case. Further understanding is provided by [Text Mining with R](https://www.tidytextmining.com/ngrams.html).
+
+To make the text machine readable all elements were tokenized into so called ngrams. Two consecutive words are called bigrams, three are called trigrams and so on. The maximum ngram length are quadgrams. Based on the length of the user input the engine researches the ngram for the most common next word. If three words are provided as input the engine searches through all quadgrams for this word order and provides the next word. If our dataset would only consinst of our example on the right, the most probable next word for the user input 'this is a' would be 'test'.
+
+
+</font>
+
+
+## Fallback: Levenshtein Simulation
+<div style= "float:right;position: relative; top: 20px;">
+```{r Fallback, echo = FALSE, out.width = "100%", fig.pos="h"}
+library(knitr)
+test <- c("C:/Projekte/Projects/R/Coursera/Week 10/Shiny/Word_Prediction/www/levenshtein.PNG")
+include_graphics(test)
+```
+</div>
+
+<font size="3">
+What if there is no match between user input and the text basis?
+
+In this case the engine has a built-in fallback method and starts a levenshtein simulation. Let's assume the user input was: 'wher ar yo'.
+
+The engine calculates for each word the nearest word based on the levenshtein-distance The results are summed and the row with the highest amount of points is expected to be the most probable input the user actually wanted to provide.
+
+In our case the suggestion would be 'where are you'.
+
+The engine restarts its calculation with the assumed user input and provides the most probable next word.
+
+Also here the maximum number of words the engine would handle are three words. If the user input is longer, the engine only takes the last three words.
+
+There are many different ways to calculate the levenshtein-distance in R. In this app the default method from the package [stringdist](https://cran.r-project.org/web/packages/stringdist/stringdist.pdf) was used.
+
+
+</font>
+
+
+
+## Outlook
+<font size="4">
+What would be the next steps to improve the performance and user experience of the app?
+
+- Better data preprocessing in terms of handling of punctuation and numbers
+- Enrich data with more current values
+- Provide multilangual support
+- Storing using user input dynamically in the dataset as basis for further prediction
+- Extending the ngrams to longer phrases
+
+<br>
+<hr>
+<br>
+
+For further reading please check
+
+- [The app: NextWord!](https://petergajda.shinyapps.io/Next_Word_Prediction/)
+- github repository
+- [Milestone Report - Data preprocessing](https://rpubs.com/pgajda/Milestone_Report)
+- [Peter Gajda on Twitter](https://twitter.com/ptrgjd)
+
+</font>
+

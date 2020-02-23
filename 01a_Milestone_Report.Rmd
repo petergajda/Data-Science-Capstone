@@ -1,0 +1,664 @@
+---
+title: "Data Science Capstone - Milestone Report"
+author: "Peter Gajda"
+date: "February 1, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This is the milestone report for the Data Science Capstone of the Coursera Data Science Specialization of the Johns Hopkins University.
+
+The goal of the report is to show a brief understanding of the data structure which is provided for the capstone.
+Containing three files from twitter, blogs and news sites we will use this data to build a prediction algorithm to predict based on an user input the next word a person would expect. This concept is well known from the use of mobile phones with the application swift key.
+
+This milestone report is divided into different parts:
+
+- Loading libraries: Brief description of the r packages which we use for our approach
+- Getting the data: Description of building our initial data file
+- Data sample: Information of how we sample the data in order to get a shorter runtime of our calculation 
+- Creation of the data corpus: Preparation of the data set for natural language processing
+- Transformation of datacorpus and creation of uni-, bi-, tri- and quadgram
+- Next steps: Glimpse on the upcoming problems and solutions for the creation of our prediction app
+
+
+
+## Loading packages
+
+The following r script uses different packges.
+dplyr, data.table and tidyr are mainly used for data manipulation. The text mining part is mainly done with tm and ngram, especially the creation of the data corpus, since the tm package provides a convenient way to adapt the data corpus for our purposes. The creation of the ngrams is done with the tidytext package, because this package provided a may convenient and stable way than the tm package.
+treemap, ggraph and igraph are used for data visualisation.
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(dplyr)
+library(data.table)
+library(tidyr)
+library(tidytext)
+library(tm)
+library(ngram)
+library(treemap)
+library(ggraph)
+library(igraph)
+```
+
+## Getting the data
+
+The following steps show how we are getting the data via a readLines command.
+The data files were downloaded from this source: <https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip>
+
+#### Creating mainpath
+```{r mainpaths, echo=TRUE}
+mainpath  <- "C:/Projekte/Projects/R/Coursera/Week 10/data/"
+blogstxt <- "en_US.blogs.txt"
+newstxt  <- "en_US.news.txt"
+twittertxt <- "en_US.twitter.txt"
+```
+
+#### Reading in Data
+```{r Reading, echo=TRUE}
+twitter <- readLines(paste(mainpath, twittertxt, sep=""), warn=FALSE, encoding="UTF-8")
+blogs <- readLines(paste(mainpath, blogstxt, sep=""), warn=FALSE, encoding="UTF-8")
+news <- readLines(paste(mainpath, newstxt, sep=""), warn=FALSE, encoding="UTF-8")
+```
+
+## Exploration of the Input files
+
+To understand the dataset we create a data.table with different information about absolute values such as the size, lines, word and character count. Since the sample data set will be obviously smaller, we create relative metrics, such as words and characters per line, which will show us later a better understanding in how far the sample file could be a good representation of the whole data set.
+
+#### Creating overview of Input files
+```{r Overview_Files, echo=TRUE}
+twitter_size <- file.info(paste(mainpath, twittertxt, sep=""))$size/1024/1024
+twitter_lines <- as.numeric(summary(twitter)[1])
+twitter_words <- wordcount(twitter)
+twitter_characters <- sum(nchar(twitter))
+
+blogs_size <- file.info(paste(mainpath, blogstxt, sep=""))$size/1024/1024
+blogs_lines <- as.numeric(summary(blogs)[1])
+blogs_words <- wordcount(blogs)
+blogs_characters <- sum(nchar(blogs))
+
+news_size <- file.info(paste(mainpath, newstxt, sep=""))$size/1024/1024
+news_lines <- as.numeric(summary(news)[1])
+news_words <- wordcount(news)
+news_characters <- sum(nchar(news))
+
+
+file_exploration <- data.frame(File = c("blogs", "news", "twitter"),
+           Size_MB = c(blogs_size, news_size, twitter_size),
+           Lines = c(blogs_lines, news_lines, twitter_lines),
+           Words = c(blogs_words, news_words, twitter_words),
+           Characters = c(blogs_characters, news_characters, twitter_characters),
+           Words_per_Line = c(blogs_words/blogs_lines, news_words/news_lines, twitter_words/twitter_lines),
+           Ch._per_Line = c(blogs_characters/blogs_lines, news_characters/news_lines, twitter_characters/twitter_lines)
+           )
+
+file_exploration
+```
+
+As we can see, the input file size of each file is around 200 MB.
+The twitter file contains the most lines.
+
+## Data sample
+
+Computation of huge text documents bring problems, especially concerning memory space.
+Therefore, the random segmentation of the data into a sample set is necessary to provide a convenient speed for the user with the calcuation of the further app but still the necessary accuracy.
+
+Since the provided data is not a representative source of the english language we do not have to respect the size or other given shape of the data set. It's more important to create a small data set with as much different - but still representative - word combinations as possible, to have a heterogenic data sample as possible.
+
+#### Unique words 
+
+Our first approach is to count the number of unique words per dataset.  
+The sample is done with a simple biased coinflip decision per line of each file via rbinom command.
+It's important to understand, that we erase **lines** per document, so regarding our previous data table it's important to remember that the twitter file contained much more lines than the other two.
+We explore each data set with 100%, 90%, 50%, 30% and 10% of the lines.
+
+```{r Unique_words, echo=TRUE}
+set.seed(202003)
+
+twitter100 <- tibble(line = 1:length(twitter), text = twitter) %>%
+  unnest_tokens(word, text)
+
+twitter_sample10 <- twitter[rbinom(twitter_lines, 1, 0.1) == 1]
+twitter_sample10 <- tibble(line = 1:length(twitter_sample10), text = twitter_sample10) %>%
+  unnest_tokens(word, text)
+
+twitter_sample30 <- twitter[rbinom(twitter_lines, 1, 0.3) == 1]
+twitter_sample30 <- tibble(line = 1:length(twitter_sample30), text = twitter_sample30) %>%
+  unnest_tokens(word, text)
+
+twitter_sample50 <- twitter[rbinom(twitter_lines, 1, 0.5) == 1]
+twitter_sample50 <- tibble(line = 1:length(twitter_sample50), text = twitter_sample50) %>%
+  unnest_tokens(word, text)
+
+twitter_sample70 <- twitter[rbinom(twitter_lines, 1, 0.7) == 1]
+twitter_sample70 <- tibble(line = 1:length(twitter_sample70), text = twitter_sample70) %>%
+  unnest_tokens(word, text)
+
+twitter_sample90 <- twitter[rbinom(twitter_lines, 1, 0.9) == 1]
+twitter_sample90 <- tibble(line = 1:length(twitter_sample90), text = twitter_sample90) %>%
+  unnest_tokens(word, text)
+
+blogs100 <- tibble(line = 1:length(blogs), text = blogs) %>%
+  unnest_tokens(word, text)
+
+blogs_sample10 <- blogs[rbinom(blogs_lines, 1, 0.1) == 1]
+blogs_sample10 <- tibble(line = 1:length(blogs_sample10), text = blogs_sample10) %>%
+  unnest_tokens(word, text)
+
+blogs_sample30 <- blogs[rbinom(blogs_lines, 1, 0.3) == 1]
+blogs_sample30 <- tibble(line = 1:length(blogs_sample30), text = blogs_sample30) %>%
+  unnest_tokens(word, text)
+
+blogs_sample50 <- blogs[rbinom(blogs_lines, 1, 0.5) == 1]
+blogs_sample50 <- tibble(line = 1:length(blogs_sample50), text = blogs_sample50) %>%
+  unnest_tokens(word, text)
+
+blogs_sample70 <- blogs[rbinom(blogs_lines, 1, 0.7) == 1]
+blogs_sample70 <- tibble(line = 1:length(blogs_sample70), text = blogs_sample70) %>%
+  unnest_tokens(word, text)
+
+blogs_sample90 <- blogs[rbinom(blogs_lines, 1, 0.9) == 1]
+blogs_sample90 <- tibble(line = 1:length(blogs_sample90), text = blogs_sample90) %>%
+  unnest_tokens(word, text)
+
+news100 <- tibble(line = 1:length(news), text = news) %>%
+  unnest_tokens(word, text)
+
+news_sample10 <- news[rbinom(news_lines, 1, 0.1) == 1]
+news_sample10 <- tibble(line = 1:length(news_sample10), text = news_sample10) %>%
+  unnest_tokens(word, text)
+
+news_sample30 <- news[rbinom(news_lines, 1, 0.3) == 1]
+news_sample30 <- tibble(line = 1:length(news_sample30), text = news_sample30) %>%
+  unnest_tokens(word, text)
+
+news_sample50 <- news[rbinom(news_lines, 1, 0.5) == 1]
+news_sample50 <- tibble(line = 1:length(news_sample50), text = news_sample50) %>%
+  unnest_tokens(word, text)
+
+news_sample70 <- news[rbinom(news_lines, 1, 0.7) == 1]
+news_sample70 <- tibble(line = 1:length(news_sample70), text = news_sample70) %>%
+  unnest_tokens(word, text)
+
+news_sample90 <- news[rbinom(news_lines, 1, 0.9) == 1]
+news_sample90 <- tibble(line = 1:length(news_sample90), text = news_sample90) %>%
+  unnest_tokens(word, text)
+```
+
+In the next step we build a data table where we calculate percentages how many unique words remain relatively to our original file.
+
+```{r Unique_words_table, echo=TRUE}
+t100 <- n_distinct(twitter100$word) / n_distinct(twitter100$word) * 100
+t90 <- n_distinct(twitter_sample90$word) / n_distinct(twitter100$word) * 100
+t70 <- n_distinct(twitter_sample70$word) / n_distinct(twitter100$word) * 100
+t50 <- n_distinct(twitter_sample50$word) / n_distinct(twitter100$word) * 100
+t30 <- n_distinct(twitter_sample30$word) / n_distinct(twitter100$word) * 100
+t10 <- n_distinct(twitter_sample10$word) / n_distinct(twitter100$word) * 100
+
+b100 <- n_distinct(blogs100$word) / n_distinct(blogs100$word) * 100
+b90 <- n_distinct(blogs_sample90$word) / n_distinct(blogs100$word) * 100
+b70 <- n_distinct(blogs_sample70$word) / n_distinct(blogs100$word) * 100
+b50 <- n_distinct(blogs_sample50$word) / n_distinct(blogs100$word) * 100
+b30 <- n_distinct(blogs_sample30$word) / n_distinct(blogs100$word) * 100
+b10 <- n_distinct(blogs_sample10$word) / n_distinct(blogs100$word) * 100
+
+n100 <- n_distinct(news100$word) / n_distinct(news100$word) * 100
+n90 <- n_distinct(news_sample90$word) / n_distinct(news100$word) * 100
+n70 <- n_distinct(news_sample70$word) / n_distinct(news100$word) * 100
+n50 <- n_distinct(news_sample50$word) / n_distinct(news100$word) * 100
+n30 <- n_distinct(news_sample30$word) / n_distinct(news100$word) * 100
+n10 <- n_distinct(news_sample10$word) / n_distinct(news100$word) * 100
+
+unique_words <- data.frame(File = c("blogs", "news", "twitter"),
+                              p100  = c(b100, n100, t100),
+                           p90 = c(b90, n90, t90),
+                           p70 = c(b70, n70, t70),
+                           p50 = c(b50, n50, t50),
+                           p30 = c(b30, n30, t30),
+                           p10 = c(b10, n10, t10))
+
+unique_words
+```
+
+The combination of the 50% news, 50% blogs and 10% twitter sample leads us to the following share of unique words compared to the combined original files.
+
+```{r Unique_words_combination, echo=TRUE}
+unique_words_combination <- combine(news_sample50$word, blogs_sample50$word, twitter_sample10$word)
+unique_words_100 <- combine(news100$word, blogs100$word, twitter100$word)
+n_distinct(unique_words_combination) / n_distinct(unique_words_100)
+```
+
+This was just a first approach. During the computation of the final app product we will still have to iterate the file size to decide what will be the best trade off between accuracy and speed.
+
+#### Removing unnecessary data files
+
+So far we've created a lot of data variables which we won't need any more for our next steps.
+In order to speed up calculation we will remove them from our workspace.
+This will happen a couple of more times during this process. There won't be any more comments concerning this point.
+
+```{r Remove_0, echo=TRUE}
+rm(twitter100,
+twitter_sample10,
+twitter_sample30,
+twitter_sample50,
+twitter_sample70,
+twitter_sample90,
+news100,
+news_sample10,
+news_sample30,
+news_sample50,
+news_sample70,
+news_sample90,
+blogs100,
+blogs_sample10,
+blogs_sample30,
+blogs_sample50,
+blogs_sample70,
+blogs_sample90,
+t100,
+t90,
+t70,
+t50,
+t30,
+t10,
+n100,
+n90,
+n70,
+n50,
+n30,
+n10,
+b100,
+b90,
+b70,
+b50,
+b30,
+b10,
+unique_words,
+unique_words_combination,
+unique_words_100)
+```
+
+
+#### Subsetting Data via coinflip with biased probability
+
+With the information from the previous calculations we create our data samples.
+
+```{r Subsetting, echo=TRUE}
+set.seed(202003)
+twitter_sample <- twitter[rbinom(twitter_lines, 1, 0.1) == 1]
+blogs_sample <- blogs[rbinom(blogs_lines, 1, 0.3) == 1]
+news_sample <- news[rbinom(news_lines, 1, 0.3) == 1]
+```
+
+
+#### Removing unnecessary data files
+```{r Remove_1, echo=TRUE}
+rm(twitter)
+rm(blogs)
+rm(news)
+
+rm(blogs_characters)
+rm(blogs_lines)
+rm(blogs_size)
+rm(blogs_words)
+
+rm(news_characters)
+rm(news_lines)
+rm(news_size)
+rm(news_words)
+
+rm(twitter_characters)
+rm(twitter_lines)
+rm(twitter_size)
+rm(twitter_words)
+```
+
+In order to understand the difference between our input file and our samples, we create again an overview of the date sample files and compare it with the input file.
+
+#### Creating overview of Sample file
+```{r Overview_Sample, echo=TRUE}
+twitter_size <- as.numeric(object.size(twitter_sample)/1024/1024)
+twitter_lines <- as.numeric(summary(twitter_sample)[1])
+twitter_words <- wordcount(twitter_sample)
+twitter_characters <- sum(nchar(twitter_sample))
+
+blogs_size <- as.numeric(object.size(blogs_sample)/1024/1024)
+blogs_lines <- as.numeric(summary(blogs_sample)[1])
+blogs_words <- wordcount(blogs_sample)
+blogs_characters <- sum(nchar(blogs_sample))
+
+
+news_size <- as.numeric(object.size(news_sample)/1024/1024)
+news_lines <- as.numeric(summary(news_sample)[1])
+news_words <- wordcount(news_sample)
+news_characters <- sum(nchar(news_sample))
+
+
+file_exploration_sample <- data.frame(File = c("blogs", "news", "twitter"),
+                               Size_MB = c(blogs_size, news_size, twitter_size),
+                               Lines = c(blogs_lines, news_lines, twitter_lines),
+                               Words = c(blogs_words, news_words, twitter_words),
+                               Characters = c(blogs_characters, news_characters, twitter_characters),
+                               Words_per_Line = c(blogs_words/blogs_lines, news_words/news_lines, twitter_words/twitter_lines),
+                               Ch._per_Line = c(blogs_characters/blogs_lines, news_characters/news_lines, twitter_characters/twitter_lines)
+)
+```
+
+
+#### Show date table of Input file overview and sample file overview
+```{r Show_data, echo=TRUE}
+file_exploration
+file_exploration_sample
+```
+
+It's interesting to see, that the file sizes now differ a lot. The blog data set remains with around 30% of the file size whereas the news file only remains with 5.9 MB.
+However, when we compare the relative metrics *words_per_line* and *characters_per_line* we can see, that we our sampling didn't change much concerning these metrics. There are not more or less words per lines in each document, which is a good sign, because the further prediction depends on word orders.
+
+
+#### Creating treemaps for visualization
+
+Since it is hard to get a feeling of the actual word sizes of the input and sample file, we visualize the number of words per source via treemaps.
+
+```{r treemaps, echo=TRUE}
+file_source <- c("Blogs","News","Twitter")
+number_words <- c(file_exploration$Words)
+number_words_sample <- c(file_exploration_sample$Words)
+data_file <- data.frame(file_source, number_words)
+data_sample <- data.frame(file_source, number_words_sample)
+
+
+treemap(data_file,
+        index="file_source",
+        palette = "Set3",
+        vSize="number_words",
+        type="index"
+)
+
+treemap(data_sample,
+        index="file_source",
+        palette = "Set3",
+        vSize="number_words_sample",
+        type="index"
+)
+```
+
+What we can see here is that we have biased the data sample pro blogs and lost share of words from the twitter sample. Again, the input files do not represent a representative source of english language, so we do not have to care much about this finding.
+We also could assume at this point, that the characteristics of the news input file is a very formal one concerning the used language, whereas the twitter input file will be using much more slang words and was limited to a tweet character limit size.
+The blog input file could represent a good source of words for our future user prediction input.
+
+To sum up. Our data sample
+- is much smaller and biased pro the blog file
+- uses still around 50 % of the unique words of the original files
+- did not change much of the word frequency per line in each document
+
+
+
+#### Removing unnecessary objects
+```{r Removing_2, echo=TRUE}
+rm(blogs_characters)
+rm(blogs_lines)
+rm(blogs_size)
+rm(blogs_words)
+
+rm(news_characters)
+rm(news_lines)
+rm(news_size)
+rm(news_words)
+
+rm(twitter_characters)
+rm(twitter_lines)
+rm(twitter_size)
+rm(twitter_words)
+
+rm(mainpath)
+rm(data_file)
+rm(blogstxt)
+rm(newstxt)
+rm(twittertxt)
+```
+
+## Creation of the data corpus
+
+For our next steps we have to use some techniques from NLP (natural language processing) to tidy up our data set from unnecessary elements and shape the data in such way, that the machine can read and calculate with it.
+
+#### Create one data file containing all data from twitter, blogs and news
+
+Our first step is to combine the sample files into one big data_sample file.
+
+```{r Create_data_file, echo=TRUE}
+data_sample <- combine(twitter_sample, blogs_sample, news_sample)
+```
+
+#### Remove unnecessary data at this point
+```{r Remove_3, echo=TRUE}
+rm(twitter_sample)
+rm(blogs_sample)
+rm(news_sample)
+```
+
+#### Create a data_corpus for further manipulation of the data via tm-package
+
+At this point of the analysis I've decided to use the text mining package *tm* for further data manipulation which is a very convenient way to shape the data for our purposes.
+The necessary file class is a corpus which can be created via the VCorpus command.
+
+```{r Create_data_corpus, echo=TRUE}
+data_corpus <- VCorpus(VectorSource(data_sample))
+```
+
+#### Remove unnecessary data at this point
+```{r Remove_4, echo=TRUE}
+rm(data_sample)
+```
+
+#### Using generic filter and transformation operations via tm-package
+
+The next step is crucial for the further analysis. Here we decide which elements of the data we will erase. This will speed up calculations on the one hand but also brings us more accuracy on the other hand.
+But we have to be careful to not erase still important words which will be used by the user in our final app.
+One common technique in NLP, namely erasing stopwords, shouldn't be used for our purpose, because words such as "the", "to" or "I" are used very often in spoken or written language. So these words remain in the dataset and no stopwords were excluded.
+In order to generalize our data sample we lower all cases, remove punctuation which is not crucial in english language, remove numbers and erase unnercessary whitespace and construct a text document (containing meta information, which we do not to have to care about).
+The commands below are described in the *Journal of Statistical Science* in the article *Text Mining Infrastructure in R* by *Ingo Feinerer, Kurt Hornik and David Meyer* especially on page 19. see: https://www.jstatsoft.org/article/view/v025i05
+
+```{r tm_map, echo=TRUE}
+data_corpus <- tm_map(data_corpus, stripWhitespace)
+data_corpus <- tm_map(data_corpus, tolower)
+data_corpus <- tm_map(data_corpus, removePunctuation)
+data_corpus <- tm_map(data_corpus, removeNumbers)
+data_corpus <- tm_map(data_corpus, PlainTextDocument)
+```
+
+##  Transformation of datacorpus and creation of uni-, bi-, tri- and quadgram
+
+Now we have a huge tidied up data corpus, but this is still not readable for machines. The next step is to divide the text into short section of two, three or four words. This process is called *tokenization*, the output is called *ngrams*, respectively bi-, tri- or quadgrams.
+
+The tm-package provides the necessary infrastructure, but I've decided to use the approach from the book *Text Mining with R!* especially the chapter ngrams, which is available here: https://www.tidytextmining.com/ngrams.html
+
+#### transform tm data corpus into tidyr data corpus
+
+First, we have to transform our data corpus into a tidy data corpus.
+
+```{r tidy_data, echo=TRUE}
+corpus_td <- tidy(data_corpus) 
+```
+
+#### Remove unnecessary data at this point
+```{r Remove_5, echo=TRUE}
+rm(data_corpus)
+```
+
+#### Creating ngrams via tidyr
+
+In this step we use the unnest_tokens function to create our ngrams. In the same step we order our corpuses descending from the most common ngrams and calculate the share of each word order compared to the full corpus.
+
+```{r Create_ngrams, echo=TRUE}
+corpus_unigrams <- corpus_td %>%
+  unnest_tokens(word, text) %>%
+  count(word, sort = TRUE) %>%
+  mutate(share = n / sum(n))
+
+
+corpus_bigrams <- corpus_td %>%
+  unnest_tokens(word, text, token = "ngrams", n=2) %>%
+  count(word, sort = TRUE) %>%
+  mutate(share = n / sum(n))
+
+
+corpus_trigrams <- corpus_td %>%
+  unnest_tokens(word, text, token = "ngrams", n=3) %>%
+  count(word, sort = TRUE) %>%
+  mutate(share = n / sum(n))
+
+
+corpus_quadgrams <- corpus_td %>%
+  unnest_tokens(word, text, token = "ngrams", n=4) %>%
+  count(word, sort = TRUE) %>%
+  mutate(share = n / sum(n))
+```
+
+#### Plots showing the most frequent ngrams
+
+At this point it's interesting to check the 20 most common ngrams from each corpus.
+
+```{r ngram_frequencies, echo=TRUE}
+unigram_plot <- ggplot(data = slice(corpus_unigrams, 1:20), aes(x = reorder(word, n), y = n)) +
+  geom_bar(stat="identity", fill="darkblue") +
+  theme_minimal() +
+  coord_flip() +
+  labs(x = "unigram", y = "count", title = "Number of Top 20 unigrams")
+
+bigram_plot <- ggplot(data = slice(corpus_bigrams, 1:20), aes(x = reorder(word, n), y = n)) +
+  geom_bar(stat="identity", fill="darkblue") +
+  theme_minimal() +
+  coord_flip() +
+  labs(x = "bigram", y = "count", title = "Number of Top 20 bigrams")
+
+trigram_plot <- ggplot(data = slice(corpus_trigrams, 1:20), aes(x = reorder(word, n), y = n)) +
+  geom_bar(stat="identity", fill="darkblue") +
+  theme_minimal() +
+  coord_flip() +
+  labs(x = "trigram", y = "count", title = "Number of Top 20 trigrams")
+
+quadgram_plot <- ggplot(data = slice(corpus_quadgrams, 1:20), aes(x = reorder(word, n), y = n)) +
+  geom_bar(stat="identity", fill="darkblue") +
+  theme_minimal() +
+  coord_flip() +
+  labs(x = "quadgram", y = "count", title = "Number of Top 20 quadgrams")
+```
+
+
+#### Show Plots
+```{r plots, echo=TRUE}
+unigram_plot
+bigram_plot
+trigram_plot
+quadgram_plot
+```
+
+Unsurprisingly, the most common word orders contain very often used word orders in the english language, which is good, since we also want to predict common words.
+
+#### Separating words in ngrams via tidyr
+
+So far, we know what are the most common word orders of each ngram. However, this information alone is not good enough to predict words. The final step is to seperate the words in each ngram to make it readable for our future prediction algorithm.
+
+```{r Separate, echo=TRUE}
+uni_words <- corpus_unigrams
+
+bi_words <- corpus_bigrams %>%
+  separate(word, c("word1", "word2"), sep = " ")
+
+tri_words <- corpus_trigrams %>%
+  separate(word, c("word1", "word2", "word3"), sep = " ")
+
+quad_words <- corpus_quadgrams %>%
+  separate(word, c("word1", "word2", "word3", "word4"), sep = " ")
+```
+
+
+```{r Example_quad_words, echo=TRUE}
+head(quad_words)
+```
+Based on this this data structure, we get a sense of how our prediction model could work. It's most likely, that after the term *at the same* the word *time* will follow.
+However, just the term *at the* could lead us to a different prediction than *same* and then *time*.
+Therefore, we've created a bi-, tri- and quadgram data structure, to be able to predict also cases with a word input up to 3 words.
+To get a sense of the word infrastructure it's good to visualize the network of the most common ngrams, which is our final step of this analysis.
+
+#### Visualizing a network of the most common ngrams
+
+Again, this step was inspired by the *Text Mining with R!* book, which you can find here: https://www.tidytextmining.com/ngrams.html
+
+The following network analysis shows bigrams which appear more than 3000 times in the dataset, trigrams more often than 500 times and quadgrams more often than 50 times.
+
+The direction of the the arrow shows the direction of the word order, the darkness of the color shows the intensity of the connection.
+It's interesting to see, that there are a couple of *anchor* words, such as *a* or *I* from where a lot of connections to other words start. The variety and intensity of these connections differs from ngram to ngram.
+
+Of course, the following data chunks are chosen arbitrarly and should just provide a not to overwhelming visualization.
+
+```{r Network, echo=TRUE, message=FALSE, warning=FALSE}
+bigram_graph <- subset(bi_words, bi_words[, 3] > 3000) %>%
+  graph_from_data_frame()
+
+set.seed(202003)
+a <- grid::arrow(type = "closed", length = unit(.05, "inches"))
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "darkblue", size = 1) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+
+trigram_graph <- subset(tri_words, tri_words[, 4] > 500) %>%
+  graph_from_data_frame()
+  
+set.seed(202003)
+a <- grid::arrow(type = "closed", length = unit(.05, "inches"))
+ggraph(trigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "darkblue", size = 1) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+  
+  
+quadgram_graph <- subset(quad_words, quad_words[, 5] > 200) %>%
+  graph_from_data_frame()
+  
+set.seed(202003)
+a <- grid::arrow(type = "closed", length = unit(.05, "inches"))
+ggraph(quadgram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "darkblue", size = 1) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+```
+
+#### remove unnecessary files at this point
+```{r Remove_6, echo=TRUE}
+rm(a)
+rm(unigram_plot)
+rm(bigram_graph)
+rm(bigram_plot)
+rm(trigram_graph)
+rm(trigram_plot)
+rm(quadgram_graph)
+rm(quadgram_plot)
+rm(file_exploration)
+rm(file_exploration_sample)
+rm(corpus_td)
+```
+
+## Next steps
+
+Our next step is to **build a prediction algorithm** based on our data files.
+To get an idea of how this could word, we do a sample grepl command for all terms beginning with *at the same*.
+```{r Example_prediction_model, echo=TRUE}
+subset(corpus_quadgrams, grepl("^at the same", word))
+```
+
+It's obvious, that the best prediction for the next word should be *time*
+
+One problem which still has to be dealt with are **words which are not included** in the data corpus. If users make up words, we won't have a chance to make a good prediction and this is not our goal. So a feedback such as *Please try something else* should be fine.
+But common typos and misspellings of words should be covered by our prediction engine. Here, we will use a a levenshtein calculation which searches for similar words within certain boundaries.
+
+Of course, a lot of effort will be put into **speedingup calculations without losing accuracy** and finally **building our prediction app**.
